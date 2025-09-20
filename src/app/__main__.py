@@ -39,6 +39,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ydl_opts = {
             "format": "mp4[filesize<50M]/mp4",
             "outtmpl": "video.%(ext)s",
+            "cookies": "cookies.txt",
         }
 
         try:
