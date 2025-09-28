@@ -9,7 +9,13 @@ GROUP_CHAT_ID = -1002331394665
 COUNTER = 0
 
 # List of supported sites
-SUPPORTED_SITES = ["tiktok.com", "instagram.com", "youtube.com/shorts"]
+SUPPORTED_SITES = [
+    "tiktok.com", 
+    "instagram.com", 
+    "youtube.com/shorts", 
+    "youtube.com/watch", 
+    "youtu.be"
+]
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global COUNTER
@@ -32,18 +38,44 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = update.message.text
 
+    # 1️⃣ Skip Instagram stories
+    if "instagram.com/stories" in text:
+        await update.message.reply_text("⚠️ Instagram stories are not supported.")
+        return
+
     if any(site in text for site in SUPPORTED_SITES):
         # Send temporary "Downloading..." message
         waiting_msg = await update.message.reply_text("⏳ Downloading...")
 
         ydl_opts = {
-            "format": "mp4[filesize<50M]/mp4",
+            "format": "best[ext=mp4][height<=720]/mp4",
             "outtmpl": "video.%(ext)s",
             "cookies": "cookies.txt",
+            "merge_output_format": "mp4",
+            "postprocessors": [
+                {
+                    "key": "FFmpegVideoConvertor",
+                    "preferedformat": "mp4",  # ensures final mp4 container
+                },
+                {
+                    "key": "FFmpegMetadata",  # injects proper metadata
+                },
+            ],
         }
+
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                # First extract info (without download) to check duration
+                info = ydl.extract_info(text, download=False)
+
+                # 2️⃣ YouTube duration check (< 300 seconds)
+                if ("youtube.com" in text or "youtu.be" in text) and info.get("duration", 0) > 300: # type: ignore
+                    await waiting_msg.delete()
+                    await update.message.reply_text("⚠️ Only YouTube videos shorter than 5 minutes are supported.")
+                    return
+
+                # Now download
                 info = ydl.extract_info(text, download=True)
                 filename = ydl.prepare_filename(info)
 
@@ -60,9 +92,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Delete "Downloading..." message and send error notice
             await waiting_msg.delete()
             await update.message.reply_text("❌ Oops, error occurred 😬")
-
-    else:
-        pass
 
 def main():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
