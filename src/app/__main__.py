@@ -2,18 +2,20 @@ import os
 import yt_dlp
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes
+from datetime import datetime
 
 # Your BotFather token
-TELEGRAM_TOKEN = "8305754426:AAFiKu9EwWXPKMyHrfDcNmxbBOsRlQwIReU"
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "your_token")
+PC_TYPE = os.getenv("PC_TYPE", "server")
 GROUP_CHAT_ID = -1002331394665
 COUNTER = 0
 
 # List of supported sites
 SUPPORTED_SITES = [
-    "tiktok.com", 
-    "instagram.com", 
-    "youtube.com/shorts", 
-    "youtube.com/watch", 
+    "tiktok.com",
+    "instagram.com",
+    "youtube.com/shorts",
+    "youtube.com/watch",
     "youtu.be"
 ]
 
@@ -47,10 +49,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Send temporary "Downloading..." message
         waiting_msg = await update.message.reply_text("⏳ Downloading...")
 
+	# ✅ Create downloads folder if missing
+        os.makedirs("downloads", exist_ok=True)
+
+        # ✅ Unique filename per download
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
         ydl_opts = {
             "format": "best[ext=mp4][height<=720]/mp4",
-            "outtmpl": "video.%(ext)s",
-            "cookies": "cookies.txt",
+            "outtmpl": f"downloads/%(id)s_{timestamp}.%(ext)s",
             "merge_output_format": "mp4",
             "postprocessors": [
                 {
@@ -63,9 +70,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ],
         }
 
+        # due to different cookies requirements on the linux server
+        if PC_TYPE == "desktop":
+            ydl_opts.update({"cookies": "cookies.txt",})
+        elif PC_TYPE == "server":
+            ydl_opts.update({"cookiesfrombrowser": ("firefox",),})
 
         try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl: # type: ignore
                 # First extract info (without download) to check duration
                 info = ydl.extract_info(text, download=False)
 
@@ -94,7 +106,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Oops, error occurred 😬")
 
 def main():
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
+    app = Application.builder().token(TELEGRAM_TOKEN).connect_timeout(60).read_timeout(180).write_timeout(180).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.run_polling()
 
