@@ -19,6 +19,7 @@ psycopg = {extras = ["binary", "pool"], version = "^3.2.9"}
 structlog = "^25.4.0"
 yt-dlp = "^2025.9.5"
 python-telegram-bot = "^22.4"
+aiohttp = "^3.13.0"
 
 
 

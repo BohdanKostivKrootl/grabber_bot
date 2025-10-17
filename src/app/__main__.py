@@ -1,8 +1,9 @@
 import os
+import re
 import yt_dlp
+from datetime import datetime
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes
-from datetime import datetime
 
 # Your BotFather token
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "your_token")
@@ -25,6 +26,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return None
 
+    # Group ad logic
     if (
         update.message.chat_id == GROUP_CHAT_ID
         and update.message
@@ -38,9 +40,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_photo("src/app/ad.jpg", caption="🚀 Реклама для Тараса!")
             print("HERE COMES AD!!!")
 
-    text = update.message.text
+    text: str = update.message.text
+    match = re.search(r"(https?://[^\s]+)", text)
+    text = match.group(1) if match else None # type: ignore
 
-    # 1️⃣ Skip Instagram stories
+    # Skip Instagram stories
     if "instagram.com/stories" in text:
         await update.message.reply_text("⚠️ Instagram stories are not supported.")
         return
@@ -49,7 +53,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Send temporary "Downloading..." message
         waiting_msg = await update.message.reply_text("⏳ Downloading...")
 
-	# ✅ Create downloads folder if missing
+        # ✅ Create downloads folder if missing
         os.makedirs("downloads", exist_ok=True)
 
         # ✅ Unique filename per download
@@ -60,21 +64,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "outtmpl": f"downloads/%(id)s_{timestamp}.%(ext)s",
             "merge_output_format": "mp4",
             "postprocessors": [
-                {
-                    "key": "FFmpegVideoConvertor",
-                    "preferedformat": "mp4",  # ensures final mp4 container
-                },
-                {
-                    "key": "FFmpegMetadata",  # injects proper metadata
-                },
+                {"key": "FFmpegVideoConvertor", "preferedformat": "mp4"},
+                {"key": "FFmpegMetadata"},
             ],
         }
 
         # due to different cookies requirements on the linux server
         if PC_TYPE == "desktop":
-            ydl_opts.update({"cookies": "cookies.txt",})
+            ydl_opts.update({"cookies": "cookies.txt"})
         elif PC_TYPE == "server":
-            ydl_opts.update({"cookiesfrombrowser": ("firefox",),})
+            ydl_opts.update({"cookiesfrombrowser": ("firefox",)})
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl: # type: ignore
@@ -102,6 +101,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         except Exception as e:
             # Delete "Downloading..." message and send error notice
+            print("❌ Error:", e)
             await waiting_msg.delete()
             await update.message.reply_text("❌ Oops, error occurred 😬")
 
