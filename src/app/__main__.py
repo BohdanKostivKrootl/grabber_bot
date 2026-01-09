@@ -1,6 +1,7 @@
 import asyncio
 import glob
 import os
+import random
 import re
 import shutil
 from typing import List, Tuple
@@ -120,8 +121,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print("COUNTER", COUNTER)
         if COUNTER == 5:
             COUNTER = 0
-            await update.message.reply_photo("src/app/ad.jpg", caption="🚀 Реклама для Тараса!")
-            print("HERE COMES AD!!!")
+            
+            # Randomly choose between the two ads
+            ad_choice = random.choice([
+                ("src/app/taras_ad.jpg", "🚀 Реклама для Тараса!"),
+                ("src/app/katya_ad.jpg", "🌠 Реклама для Каті!")
+            ])
+            
+            await update.message.reply_photo(ad_choice[0], caption=ad_choice[1])
+            print(f"HERE COMES AD!!! ({ad_choice[0]})")
 
     text: str = update.message.text
     match = re.search(r"(https?://[^\s]+)", text)
